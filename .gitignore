@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+# 投票记录是用户产生的数据，不进版本库（部署后可重生成）
+votes.csv
