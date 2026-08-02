@@ -45,16 +45,24 @@ def update_ratings(rating_a: float, rating_b: float, score_a: float):
     return round(new_a, 1), round(new_b, 1)
 
 
-def compute_leaderboard(votes):
+def compute_leaderboard(votes, category=None):
     """从一堆投票记录里，算出每个模型的 Elo 排行榜。
 
     参数 votes：列表，每个元素是 dict，形如
-        {"model_a": "豆包", "model_b": "文心一言", "winner": "A"}
+        {"model_a": "豆包", "model_b": "文心一言", "winner": "A", "category": "写作"}
         winner 取值："A" 表示左侧模型赢、"B" 表示右侧赢、"tie" 表示平手。
+
+    参数 category：可选，传了则只统计这个类别的投票，不传就全部一起算。
 
     返回：按分数从高到低排好的列表，每项含
         model（名字）、rating（分数）、matches（比赛场数）、wins / losses / ties。
     """
+    # 如果指定了类别，先过滤
+    if category:
+        votes = [v for v in votes if v.get("category") == category]
+        if not votes:
+            return []
+
     ratings = {}      # 模型名 -> 当前分数
     matches = {}      # 模型名 -> 比赛场数
     record = {}       # 模型名 -> {"wins":, "losses":, "ties":}

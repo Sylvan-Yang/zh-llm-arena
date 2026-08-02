@@ -45,15 +45,16 @@ def save_vote(row: dict):
 
 # ---------- 2. 盲测时给两个模型“随机左右”，避免位置偏见 ----------
 def reshuffle(prompt_id: str):
-    """随机决定这道题目的两个回答，哪个放左边(A)、哪个放右边(B)。
-    类比：考试时把答卷 A/B 随机排位置，防止大家习惯性都选左边。
+    """从这道题目的所有模型回答中，随机抽 2 个做 A/B 对比，再随机左右排列。
+    类比：考试时从全班答卷中随机抽两份，再随机排 A/B 位置，防止位置偏见。
     """
     ans = prompts_data.SEED_ANSWERS.get(prompt_id, {})
     models = list(ans.keys())
     if len(models) < 2:
         st.session_state["assignment"] = None
         return
-    a, b = models[0], models[1]
+    # 随机选 2 个不同模型
+    a, b = random.sample(models, 2)
     if random.random() < 0.5:
         a, b = b, a
     st.session_state["assignment"] = {"prompt_id": prompt_id, "left": a, "right": b}
@@ -97,12 +98,34 @@ if page == "去盲测投票":
 
         st.markdown("---")
         col_a, col_b = st.columns(2)
+
+        def render_answer(text: str):
+            """根据内容智能渲染：有代码块就用 code 组件，否则保持折行可读。"""
+            import re
+            # 把所有 4+ 空格缩进或 `\n` 结尾的多行代码块用 ```` ``` ```` 包起来
+            # 简单策略：如果文本里包含明显的代码关键字，整段用 code 渲染
+            code_keywords = ('def ', 'function ', 'class ', 'import ', 'SELECT ', 'from ', 'return ', 'const ', 'let ')
+            looks_like_code = any(t in text for t in code_keywords)
+            if looks_like_code:
+                # 尝试推断语言
+                lang = 'text'
+                if 'def ' in text or 'import ' in text or 'class ' in text:
+                    lang = 'python'
+                elif 'function ' in text or 'const ' in text or 'let ' in text:
+                    lang = 'javascript'
+                elif 'SELECT ' in text.upper():
+                    lang = 'sql'
+                st.code(text, language=lang)
+            else:
+                # 纯文本：把 `\n` 折成 Markdown 的行间断行
+                st.markdown(text.replace("\n", "  \n"))
+
         with col_a:
             st.subheader("模型 A")
-            st.write(ans[left])
+            render_answer(ans[left])
         with col_b:
             st.subheader("模型 B")
-            st.write(ans[right])
+            render_answer(ans[right])
 
         st.markdown("---")
         st.write("**你觉得哪个回答更好？**（不知道是谁，凭质量投）")
@@ -140,14 +163,100 @@ else:
         lb = elo.compute_leaderboard(votes)
         st.caption(f"当前共 {len(votes)} 票。分数越高越强，初始均为 1500。")
         import pandas as pd
-        df = pd.DataFrame(lb)
-        df = df.rename(columns={
-            "model": "模型", "rating": "Elo", "matches": "场次",
-            "wins": "胜", "losses": "负", "ties": "平", "win_rate": "胜率",
-        })
-        df["胜率"] = (df["胜率"] * 100).round(1).astype(str) + "%"
-        st.dataframe(df[["模型", "Elo", "场次", "胜", "负", "平", "胜率"]],
-                     use_container_width=True)
-        st.subheader("Elo 分数对比")
-        chart_df = pd.DataFrame(lb).set_index("model")[["rating"]]
-        st.bar_chart(chart_df)
+
+        # 分类筛选
+        all_categories = ["全部（总榜）"] + sorted(set(v.get("category", "") for v in votes))
+        selected_cat = st.selectbox("📂 筛选类别", all_categories)
+
+        cat_filter = None if selected_cat == "全部（总榜）" else selected_cat
+        lb = elo.compute_leaderboard(votes, category=cat_filter)
+        filtered_count = len([v for v in votes if cat_filter is None or v.get("category") == cat_filter])
+        st.caption(f"{selected_cat}：共 {filtered_count} 票。分数越高越强，初始均为 1500。")
+
+        if not lb:
+            st.info("该类别还没有投票记录，去盲测页投几票吧～")
+        else:
+            df = pd.DataFrame(lb)
+            df = df.rename(columns={
+                "model": "模型", "rating": "Elo", "matches": "场次",
+                "wins": "胜", "losses": "负", "ties": "平", "win_rate": "胜率",
+            })
+            df["胜率"] = (df["胜率"] * 100).round(1).astype(str) + "%"
+            st.dataframe(df[["模型", "Elo", "场次", "胜", "负", "平", "胜率"]],
+                         use_container_width=True)
+            st.subheader("Elo 分数对比")
+            chart_df = pd.DataFrame(lb).set_index("model")[["rating"]]
+            st.bar_chart(chart_df)
+
+        # ---- 能力雷达：各品类排名总览 ----
+        st.markdown("---")
+        st.subheader("📊 各模型 × 各品类 Elo 排名矩阵")
+        cats_in_data = sorted(set(v.get("category", "") for v in votes))
+        if len(cats_in_data) >= 1:
+            rows = []
+            model_names = sorted(set(
+                m for v in votes for m in [v["model_a"], v["model_b"]]
+            ))
+            for cat in cats_in_data:
+                cat_lb = elo.compute_leaderboard(votes, category=cat)
+                rank_map = {item["model"]: (i + 1, item["rating"]) for i, item in enumerate(cat_lb)}
+                for model in model_names:
+                    rank_info = rank_map.get(model)
+                    rows.append({
+                        "品类": cat,
+                        "模型": model,
+                        "排名": rank_info[0] if rank_info else "-",
+                        "Elo": round(rank_info[1], 1) if rank_info else "-",
+                    })
+            matrix_df = pd.DataFrame(rows)
+            # 透视成 品类 × 模型 的 Elo 表格
+            pivot = matrix_df.pivot(index="品类", columns="模型", values="Elo")
+            # 按行排序
+            cat_order = ["写作", "推理", "编码", "数学", "翻译", "长文理解"]
+            pivot = pivot.reindex([c for c in cat_order if c in pivot.index])
+            st.dataframe(pivot, use_container_width=True)
+            st.caption("数字为 Elo 分数，\"-\" 表示该品类尚无投票数据。")
+
+            # ---- 自动推荐总结 ----
+            st.markdown("---")
+            st.subheader("💡 你该选哪个模型？")
+            # 找出每个品类的冠军和对应分数
+            recommendations = []
+            for cat in sorted(cats_in_data):
+                cat_lb = elo.compute_leaderboard(votes, category=cat)
+                if cat_lb:
+                    top_model = cat_lb[0]
+                    recommendations.append((cat, top_model["model"], top_model["rating"]))
+
+            if not recommendations:
+                st.caption("暂无足够数据给出推荐，再多投几票吧～")
+            else:
+                # 按模型分组：哪个模型擅长哪些品类
+                model_strengths = {}
+                for cat, model, rating in recommendations:
+                    if model not in model_strengths:
+                        model_strengths[model] = []
+                    model_strengths[model].append(cat)
+
+                for model in model_names:
+                    strengths = model_strengths.get(model, [])
+                    # 取每个模型的总体排名
+                    total_lb = elo.compute_leaderboard(votes)
+                    total_rank = next((i + 1 for i, m in enumerate(total_lb) if m["model"] == model), "-")
+
+                    if strengths:
+                        cats_str = "、".join(strengths)
+                        n = len(strengths)
+                        st.markdown(
+                            f"🏆 **{model}**（总榜第 **{total_rank}** 名）—— "
+                            f"在 **{n}** 个品类排第一：{cats_str}。"
+                            f"{' 综合实力最强，无明显短板。' if n >= 3 else ''}"
+                            f"{' 偏科型选手，在擅长的领域表现突出。' if n <= 1 else ''}"
+                        )
+                    else:
+                        st.markdown(
+                            f"⚪ **{model}**（总榜第 **{total_rank}** 名）—— "
+                            f"暂无品类冠军，综合实力有待更多数据验证。"
+                        )
+        else:
+            st.caption("各品类暂无投票数据，多投几票后这里会出现对比矩阵。")
