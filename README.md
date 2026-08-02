@@ -36,11 +36,13 @@
 
 ## ✨ 功能（Features）
 
-- [x] 中文 prompt 评测集（6 类 × 5+ 条，持续扩充）—— 见 `prompts/zh-prompts-v1.md`
-- [x] 匿名 A/B 盲测投票界面（MVP 已可运行，见 `app.py`）
-- [x] Elo 实时排行榜（总榜，见 `app.py` + `elo.py`）
+- [x] 中文 prompt 评测集（6 类 × 5 条 = 30 题，持续扩充）—— 见 `prompts/zh-prompts-v1.md`
+- [x] 匿名 A/B 盲测投票界面（4 模型随机对战，智能代码渲染）—— 见 `app.py`
+- [x] Elo 实时排行榜（总榜 + 6 类分榜 + 能力雷达矩阵）—— 见 `app.py` + `elo.py`
+- [x] 自动推荐总结（基于品类冠军，自然语言推荐"你该选哪个模型"）
+- [ ] 接真实 LLM API 自动生成回答（替换 mock 数据）
 - [ ] LLM-as-Judge 自动评分 + 裁判说明
-- [ ] 分类别胜率矩阵 / 趋势图
+- [ ] 胜率矩阵 / 趋势图
 - [ ] 一键分享单次盲测结果
 
 ---
@@ -85,9 +87,8 @@ streamlit run app.py
 
 ## 📊 在线演示与排行榜（Demo & Leaderboard）
 
-<!-- TODO: 部署后贴链接 -->
-- Demo：(待部署，可用上面命令本地运行)
-- 中文 LLM 体验排行榜：(待发布，附真实盲测票数与样本量)
+- 🚀 **在线体验**：[zh-llm-arena.streamlit.app](https://zh-llm-arena-cnhryluhqog2myjhxtt7id.streamlit.app)
+- 中文 LLM 体验排行榜：(待收集真实盲测数据后发布)
 
 ---
 
@@ -95,10 +96,11 @@ streamlit run app.py
 
 - [x] 中文评测集 v1（6 类 × 30 条）
 - [x] A/B 盲测 MVP（投票 + Elo 排行榜，本地可跑）
+- [x] 4 模型完整回答数据（豆包 / 文心一言 / DeepSeek / 通义千问）
+- [x] 6 大类别分榜 + 能力雷达矩阵 + 自动推荐
 - [ ] 接真实 LLM API 自动生成回答（替换 mock 数据）
 - [ ] LLM-as-Judge
 - [ ] 收集首批真实盲测数据并发布榜单
-- [ ] 分类别深度分析报告
 - [ ] 部署上线（Streamlit Community Cloud）
 
 ---
