@@ -13,7 +13,7 @@
 
 ## 二、给题目补“模型回答”
 
-目前 `prompts_data.py` 里的 `SEED_ANSWERS` 只有 5 道题有回答。你有两个办法：
+目前 `prompts_data.py` 里的 `SEED_ANSWERS` 已覆盖全部 30 道题 × 4 个模型（豆包 / 文心一言 / DeepSeek / 通义千问）。你有两个办法：
 
 - **手动（零代码）**：去豆包 / 文心一言 / DeepSeek / Kimi 的网页版，把同一道题问一遍，把回答复制进 `SEED_ANSWERS[prompt_id]`。
 - **自动（进阶）**：写几行代码调各家 API 生成，替换 mock 数据来源（结构不用动）。
